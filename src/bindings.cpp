@@ -19,6 +19,7 @@ PYBIND11_MODULE(caen_v1730, m) {
         .def("acquire_multiple", &V1730Digitizer::acquire_multiple)
         .def("count_hits", &V1730Digitizer::count_hits)
         .def("set_threshold", &V1730Digitizer::set_threshold)
+        .def("pull_charge",&V1730Digitizer::pull_charge)
         .def("set_record_length", &V1730Digitizer::set_record_length)
         .def("set_post_trig_size", &V1730Digitizer::set_post_trig_size);
 }

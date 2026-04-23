@@ -24,7 +24,7 @@ public:
     std::vector<std::vector<std::vector<uint16_t>>> acquire_multiple(int qty);
     std::vector<std::vector<uint16_t>> read_waveforms();
 
-    std::vector<int> pull_binned_charge(int waveforms_sampled, std::vector<uint16_t> bins);
+    std::vector<std::vector<float>> pull_charge(int waveforms_sampled);
 
 private:
     int handle;
@@ -35,6 +35,8 @@ private:
     char* eventPtr = nullptr;
     CAEN_DGTZ_UINT16_EVENT_t* evt = nullptr;
     uint32_t bufferSize;
+
+    uint16_t trigger_channel = 1;
 
     void check_error(int ret);
 

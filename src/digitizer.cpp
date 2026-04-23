@@ -94,6 +94,71 @@ void V1730Digitizer::set_threshold(uint16_t channel, float threshold) {
     thresholds[channel] = threshold;
 }
 
+std::vector<std::vector<float>> V1730Digitizer::pull_charge(int waveforms_sampled){
+    /*
+    Pull `waveforms_sampled` number of waveforms and collect some charges from the waveforms. Skip the trigger channel 
+    */
+    
+    std::vector<std::vector<float>> charges;
+
+    charges.push_back({}); 
+    charges.push_back({}); 
+
+    std::vector<int> these_channels = {0, 2};
+
+    int sample_index = 0;
+    uint32_t size = 0;
+    uint32_t numEvents;
+    float this_charge;
+
+    for (int i=0; i<waveforms_sampled; i++){
+        waveforms.clear(); 
+        check_error(CAEN_DGTZ_ReadData(
+            handle,
+            CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT,
+            buffer,
+            &size
+        ));
+        if (size==0){
+            continue; // No data, skip
+        }
+
+        CAEN_DGTZ_EventInfo_t eventInfo;
+        check_error(CAEN_DGTZ_GetNumEvents(handle, buffer, size, &numEvents)); 
+        for (uint32_t i = 0; i < numEvents; ++i) {
+            check_error(CAEN_DGTZ_GetEventInfo(
+                handle, buffer, size, i, &eventInfo, &eventPtr
+            ));
+            
+            check_error(CAEN_DGTZ_DecodeEvent(handle, eventPtr, (void**)&evt));
+            
+            for(int channel_index=0; channel_index<these_channels.size(); channel_index++){
+                uint16_t last_value=0;
+                sample_index = 0;
+                this_charge = 0;
+
+
+                if (evt->ChSize[these_channels[channel_index]] > 0) {
+                    std::vector<uint16_t> wf(
+                        evt->DataChannel[these_channels[channel_index]],
+                        evt->DataChannel[these_channels[channel_index]] + evt->ChSize[these_channels[channel_index]]
+                    );
+
+                    for (int sample_index=0; sample_index<wf.size(); sample_index++){
+                        this_charge=this_charge+wf[sample_index]/wf.size();
+                    }
+
+                    charges[channel_index].push_back(this_charge);
+                }
+            }
+            check_error(CAEN_DGTZ_FreeEvent(handle, (void**)&evt));
+        }
+
+    }
+
+    return charges;
+}
+
 std::vector<int> V1730Digitizer::count_hits(int waveforms_sampled){
     /*
     Pull `waveforms_sampled` number of waveforms and count how many times each channel exceeds the threshold.
