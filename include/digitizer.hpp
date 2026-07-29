@@ -21,10 +21,11 @@ public:
     void set_threshold(uint16_t channel, float threshold);
 
     std::vector<int> count_hits(int waveforms_sampled);
-    std::vector<std::vector<std::vector<uint16_t>>> acquire_multiple(int qty);
-    std::vector<std::vector<uint16_t>> read_waveforms();
+    std::vector<std::vector<std::vector<uint16_t>>> read_waveforms();
 
     std::vector<std::vector<float>> pull_charge(int waveforms_sampled);
+
+    uint32_t read_register(uint32_t address);
 
 private:
     int handle;

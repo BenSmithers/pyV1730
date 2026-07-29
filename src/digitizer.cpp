@@ -49,6 +49,13 @@ void V1730Digitizer::set_post_trig_size(uint32_t percent){
     }
 }
 
+uint32_t V1730Digitizer::read_register(uint32_t address){
+    uint32_t data;
+    check_error(CAEN_DGTZ_ReadRegister(handle, address, &data));
+    return data;
+
+}
+
 void V1730Digitizer::configure_external_trigger() {
     check_error(CAEN_DGTZ_SetAcquisitionMode(handle, CAEN_DGTZ_FIRST_TRG_CONTROLLED));
     // CAEN_DGTZ_GetSWTriggerMode 
@@ -60,21 +67,21 @@ void V1730Digitizer::configure_external_trigger() {
     ));
 
     // Enable channels (example: first 3)
+    // 1110 --> 7
     uint32_t channelMask = 0x7;
     check_error(CAEN_DGTZ_SetChannelEnableMask(handle, channelMask));
 
     // Set record length (samples)
     check_error(CAEN_DGTZ_SetRecordLength(handle, 128));
-    check_error(CAEN_DGTZ_SetPostTriggerSize(handle, 100));
+    check_error(CAEN_DGTZ_SetPostTriggerSize(handle, 90));
 
     //add delay time between trigger and acquisition start to capture the rising edge of the signal
     // use 60 samples (or 30ns)
-    //check_error(CAEN_DGTZ_SetDPPPreTriggerSize(handle, 2, 60));
+    //check_error(CAEN_DGTZ_SetDPPPreTriggerSize(handle, 2, 90));
 
-    uint32_t maxnumaggregates; 
-    check_error(CAEN_DGTZ_SetMaxNumAggregatesBLT(handle, 100));
-    check_error(CAEN_DGTZ_SetMaxNumEventsBLT(handle, 100));
-    check_error(CAEN_DGTZ_GetMaxNumAggregatesBLT(handle, &maxnumaggregates));
+    uint32_t maxnumaggregates=100; 
+    check_error(CAEN_DGTZ_SetMaxNumAggregatesBLT(handle, maxnumaggregates));
+    check_error(CAEN_DGTZ_SetMaxNumEventsBLT(handle, maxnumaggregates));
 
 }
 
@@ -228,19 +235,7 @@ std::vector<int> V1730Digitizer::count_hits(int waveforms_sampled){
     return hit_counts;
 }
 
-std::vector<std::vector<std::vector<uint16_t>>> V1730Digitizer::acquire_multiple(int qty){
-    std::vector<std::vector<std::vector<uint16_t>>> waveforms; 
-
-    for (int i=0; i<qty; i++){
-        waveforms.push_back(
-            read_waveforms()
-        );
-    }
-
-    return waveforms;
-};
-
-std::vector<std::vector<uint16_t>> V1730Digitizer::read_waveforms() {
+std::vector<std::vector<std::vector<uint16_t>>> V1730Digitizer::read_waveforms() {
     uint32_t size = 0;
 
     check_error(CAEN_DGTZ_ReadData(
@@ -255,11 +250,12 @@ std::vector<std::vector<uint16_t>> V1730Digitizer::read_waveforms() {
 
     CAEN_DGTZ_EventInfo_t eventInfo;
 
-    std::vector<std::vector<uint16_t>> waveforms;
+    std::vector<std::vector<std::vector<uint16_t>>> waveforms;
+    for(int i =0;i<boardInfo.Channels;i++){
+        waveforms.push_back({});
+    }
 
     uint32_t numEvents;
-    
-    // only ever assigns 1? 
     check_error(CAEN_DGTZ_GetNumEvents(handle, buffer, size, &numEvents)); 
 
     for (uint32_t i = 0; i < numEvents; ++i) {
@@ -276,7 +272,7 @@ std::vector<std::vector<uint16_t>> V1730Digitizer::read_waveforms() {
                     evt->DataChannel[ch],
                     evt->DataChannel[ch] + evt->ChSize[ch]
                 );
-                waveforms.push_back(wf);
+                waveforms[ch].push_back(wf);
 
             }
         }
