@@ -24,6 +24,10 @@ V1730Digitizer::V1730Digitizer(int link_type, int link_num, int conet_node, uint
     check_error(ret);
 }
 
+void V1730Digitizer::recalibrate(){
+    check_error(CAEN_DGTZ_Calibrate(handle));
+}
+
 V1730Digitizer::~V1730Digitizer() {
     if (buffer)
         CAEN_DGTZ_FreeReadoutBuffer(&buffer);
@@ -166,7 +170,7 @@ std::vector<std::vector<float>> V1730Digitizer::pull_charge(int waveforms_sample
     return charges;
 }
 
-std::vector<int> V1730Digitizer::count_hits(int waveforms_sampled){
+py::array V1730Digitizer::count_hits(int waveforms_sampled){
     /*
     Pull `waveforms_sampled` number of waveforms and count how many times each channel exceeds the threshold.
         Expect channel 1 to always show a hit - this is the trigger channel. 
@@ -204,26 +208,28 @@ std::vector<int> V1730Digitizer::count_hits(int waveforms_sampled){
             
             for(int channel_index=0; channel_index<boardInfo.Channels; channel_index++){
                 found_hit = false; 
-                uint16_t last_value=0;
+                uint16_t pedestal=0;
                 sample_index = 0;
+                
 
                 if (evt->ChSize[channel_index] > 0) {
                     std::vector<uint16_t> wf(
                         evt->DataChannel[channel_index],
                         evt->DataChannel[channel_index] + evt->ChSize[channel_index]
                     );
-
+                    
                     while((!found_hit) && sample_index<wf.size()){
-
-                        if(sample_index==0){
-                            last_value = wf[sample_index];   
-                        }
-                        if ((wf[sample_index]-last_value) < thresholds[channel_index]){
+                        if (sample_index <= 7){ // use the first 8 samples to get the average pedestal value 
+                            pedestal += wf[sample_index]; // what if this overflows?? let's deal with that when it happens...
+                            if (sample_index==7){
+                                // divide by 8, drop the remainder (shift three bits over)
+                                pedestal = pedestal >> 3; 
+                            }
+                        }else if ((wf[sample_index]-pedestal) < thresholds[channel_index]){ // then look for triggers 
                             hit_counts[channel_index]++;
                             found_hit = true;
                             
                         }
-                        last_value = wf[sample_index];
                         sample_index++; 
                     }
                 }
@@ -232,7 +238,7 @@ std::vector<int> V1730Digitizer::count_hits(int waveforms_sampled){
         }
 
     }
-    return hit_counts;
+    return py::cast(hit_counts);
 }
 
 std::vector<std::vector<std::vector<uint16_t>>> V1730Digitizer::read_waveforms() {

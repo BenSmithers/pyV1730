@@ -39,6 +39,8 @@ if __name__ == "__main__":
     )
     digi.configure_external_trigger()
     digi.set_threshold(2, -25)
+    digi.set_post_trig_size(75)
+    digi.recalibrate()
 
 
     buffer_handle = client.open_event_buffer("SYSTEM")
