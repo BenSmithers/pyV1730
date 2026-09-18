@@ -71,8 +71,8 @@ void V1730Digitizer::configure_external_trigger() {
     ));
 
     // Enable channels (example: first 3)
-    // 1110 --> 7
-    uint32_t channelMask = 0x7;
+    // 0110 --> 6
+    uint32_t channelMask = 0x6;
     check_error(CAEN_DGTZ_SetChannelEnableMask(handle, channelMask));
 
     // Set record length (samples)
@@ -83,7 +83,7 @@ void V1730Digitizer::configure_external_trigger() {
     // use 60 samples (or 30ns)
     //check_error(CAEN_DGTZ_SetDPPPreTriggerSize(handle, 2, 90));
 
-    uint32_t maxnumaggregates=100; 
+    uint32_t maxnumaggregates=150; 
     check_error(CAEN_DGTZ_SetMaxNumAggregatesBLT(handle, maxnumaggregates));
     check_error(CAEN_DGTZ_SetMaxNumEventsBLT(handle, maxnumaggregates));
 
