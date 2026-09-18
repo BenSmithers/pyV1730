@@ -11,6 +11,7 @@ def run_start(client, run_no, digi):
     try: 
         data_mode = client.odb_get("/Equipment/controller0/Settings/data_mode") 
         darkrate_mode = data_mode==0
+        digi.recalibrate()
         
         if darkrate_mode:
             digi.start_acquisition()
@@ -42,19 +43,20 @@ if __name__ == "__main__":
     digi.set_post_trig_size(75)
     digi.recalibrate()
 
+    communication_counter = 0
 
     buffer_handle = client.open_event_buffer("SYSTEM")
 
     scan_request_handle = client.register_event_request(buffer_handle,event_id=1)
-    client.register_transition_callback(midas.TR_START, 1, lambda _client,_run_no: run_start(_client, _run_no, digi))
-    client.register_transition_callback(midas.TR_STOP, 1,  lambda _client,_run_no: run_stop(_client, _run_no, digi))
+    client.register_transition_callback(midas.TR_START.value, 1, lambda _client,_run_no: run_start(_client, _run_no, digi))
+    client.register_transition_callback(midas.TR_STOP.value, 1,  lambda _client,_run_no: run_stop(_client, _run_no, digi))
+    client.register_transition_callback(midas.TR_STARTABORT.value, 1,  lambda _client,_run_no: run_stop(_client, _run_no, digi))
     
     accept_events = False 
     while True: 
         event = client.receive_event(buffer_handle, async_flag=True)
         if not darkrate_mode:
             if event is not None:
-                this_time = int(time.time())
                 for bank in event.banks.values():
                     if "EOM"== bank.name[:3]:
                         digi.start_acquisition()
@@ -72,11 +74,14 @@ if __name__ == "__main__":
             new_event.header.event_id=74
             new_event.header.trigger_mask=0
             new_event.header.serial_number=counter 
-            new_event.header.timestamp= this_time
+            new_event.header.timestamp= int(time.time())
             new_event.populate_bank_and_event_size()    
 
             counter +=1 
             client.send_event(buffer_handle, new_event)
 
+        communication_counter+=1
 
-        client.communicate(1,True)
+        if communication_counter%50==0:
+            communication_counter = 1
+            client.communicate(1,True)
