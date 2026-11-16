@@ -89,6 +89,10 @@ void V1730Digitizer::configure_external_trigger() {
 
 }
 
+void V1730Digitizer::reset_counter() {
+    total_waveforms = 0;
+}
+
 void V1730Digitizer::start_acquisition() {
     check_error(CAEN_DGTZ_SWStartAcquisition(handle));
 }
@@ -105,12 +109,12 @@ void V1730Digitizer::set_threshold(uint16_t channel, float threshold) {
     thresholds[channel] = threshold;
 }
 
-std::vector<std::vector<float>> V1730Digitizer::pull_charge(int waveforms_sampled){
+std::vector<py::array> V1730Digitizer::pull_charge(int waveforms_sampled){
     /*
     Pull `waveforms_sampled` number of waveforms and collect some charges from the waveforms. Skip the trigger channel 
     */
     
-    std::vector<std::vector<float>> charges;
+    std::vector<std::vector<uint16_t>> charges;
 
     charges.push_back({}); 
     charges.push_back({}); 
@@ -120,7 +124,8 @@ std::vector<std::vector<float>> V1730Digitizer::pull_charge(int waveforms_sample
     int sample_index = 0;
     uint32_t size = 0;
     uint32_t numEvents;
-    float this_charge;
+    float this_pulse_height;
+    float min_charge; 
 
     for (int i=0; i<waveforms_sampled; i++){
         waveforms.clear(); 
@@ -146,7 +151,9 @@ std::vector<std::vector<float>> V1730Digitizer::pull_charge(int waveforms_sample
             for(int channel_index=0; channel_index<these_channels.size(); channel_index++){
                 uint16_t last_value=0;
                 sample_index = 0;
-                this_charge = 0;
+                this_pulse_height = 0;
+                min_charge = 1e6;
+                uint16_t pedestal=0;
 
 
                 if (evt->ChSize[these_channels[channel_index]] > 0) {
@@ -156,18 +163,31 @@ std::vector<std::vector<float>> V1730Digitizer::pull_charge(int waveforms_sample
                     );
 
                     for (int sample_index=0; sample_index<wf.size(); sample_index++){
-                        this_charge=this_charge+wf[sample_index]/wf.size();
+                        if (sample_index <= 7){ // use the first 8 samples to get the average pedestal value 
+                            pedestal += wf[sample_index]; // what if this overflows?? let's deal with that when it happens...
+                            if (sample_index==7){
+                                // divide by 8, drop the remainder (shift three bits over)
+                                pedestal = pedestal >> 3; 
+                            }
+                        }else{
+                            this_pulse_height = wf[sample_index]- pedestal;
+                            if (this_pulse_height<min_charge){
+                                min_charge = this_pulse_height;
+                            }
+                        }
                     }
-
-                    charges[channel_index].push_back(this_charge);
+                    charges[channel_index].push_back(min_charge);
                 }
             }
             check_error(CAEN_DGTZ_FreeEvent(handle, (void**)&evt));
         }
 
     }
+    return { py::cast(charges[0]), py::cast(charges[1]) };
+}
 
-    return charges;
+double V1730Digitizer::time_into_run(){
+    return static_cast<double>(total_waveforms)*(2.0e-9)*128.0;
 }
 
 py::array V1730Digitizer::count_hits(int waveforms_sampled){
@@ -238,8 +258,15 @@ py::array V1730Digitizer::count_hits(int waveforms_sampled){
         }
 
     }
+    
+    if ((std::numeric_limits<uint64_t>::max() - total_waveforms) < hit_counts[3] ){
+        throw std::runtime_error("Too many waveforms!");
+    }
+    total_waveforms += hit_counts[3];
     return py::cast(hit_counts);
 }
+
+
 
 std::vector<std::vector<std::vector<uint16_t>>> V1730Digitizer::read_waveforms() {
     uint32_t size = 0;

@@ -22,5 +22,7 @@ PYBIND11_MODULE(caen_v1730, m) {
         .def("recalibrate",&V1730Digitizer::recalibrate)
         .def("set_record_length", &V1730Digitizer::set_record_length)
         .def("read_register", &V1730Digitizer::read_register)
-        .def("set_post_trig_size", &V1730Digitizer::set_post_trig_size);
+        .def("set_post_trig_size", &V1730Digitizer::set_post_trig_size)
+        .def("reset_counter", &V1730Digitizer::reset_counter)
+        .def("time_into_run", &V1730Digitizer::time_into_run );
 }

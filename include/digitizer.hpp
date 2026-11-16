@@ -19,7 +19,9 @@ public:
     V1730Digitizer(int link_type, int link_num, int conet_node, uint32_t base_addr);
     ~V1730Digitizer();
 
+    double time_into_run();
     void configure_external_trigger();
+    void reset_counter();
     void start_acquisition();
     void stop_acquisition();
     void recalibrate();
@@ -30,7 +32,7 @@ public:
     py::array count_hits(int waveforms_sampled);
     std::vector<std::vector<std::vector<uint16_t>>> read_waveforms();
 
-    std::vector<std::vector<float>> pull_charge(int waveforms_sampled);
+    std::vector<py::array> pull_charge(int waveforms_sampled);
 
     uint32_t read_register(uint32_t address);
 
@@ -38,6 +40,7 @@ private:
     int handle;
     CAEN_DGTZ_BoardInfo_t boardInfo;
     std::vector<std::vector<uint16_t>> waveforms;
+    uint64_t total_waveforms = 0;
 
     char* buffer;
     char* eventPtr = nullptr;
